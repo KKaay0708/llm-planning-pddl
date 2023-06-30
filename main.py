@@ -5,7 +5,6 @@ import os
 import random
 import sys
 import time
-
 import openai
 
 FAST_DOWNWARD_ALIAS = "lama"
@@ -48,8 +47,8 @@ DOMAINS = [
 
 
 class Domain:
-    def __init__(self):
-        self.name = "default"
+    def __init__(self, name):
+        self.name = name
         # every domain should contain the context as in "in-context learning" (ICL)
         # which are the example problem in natural language.
         # For instance, in our case, context is:
@@ -128,26 +127,41 @@ class Domain:
 
 
 class Barman(Domain):
-    name = "barman" # this should match the directory name
+    def __init__(self):
+        name = "barman"
+        super().__init__(name)
 
 class Floortile(Domain):
-    name = "floortile" # this should match the directory name
+    def __init__(self):
+        name = "floortile"
+        super().__init__(name)
 
 class Termes(Domain):
-    name = "termes" # this should match the directory name
+    def __init__(self):
+        name = "termes"
+        super().__init__(name)
 
 class Tyreworld(Domain):
-    name = "tyreworld" # this should match the directory name
+    def __init__(self):
+        name = "tyreworld"
+        super().__init__(name)
 
 class Grippers(Domain):
-    name = "grippers" # this should match the directory name
+    def __init__(self):
+        name = "grippers"
+        super().__init__(name)
 
 class Storage(Domain):
-    name = "storage" # this should match the directory name
+    def __init__(self):
+        name = "storage"
+        super().__init__(name)
 
 class Blocksworld(Domain):
-    name = "blocksworld" # this should match the directory name
+    def __init__(self):
+        name = "blocksworld"
+        super().__init__(name)
 
+        
 ###############################################################################
 #
 # The agent that leverages classical planner to help LLMs to plan
@@ -221,6 +235,7 @@ class Planner:
     def query(self, prompt_text):
         server_flag = 0
         server_cnt = 0
+
         while server_cnt < 10:
             try:
                 self.update_key()
@@ -325,27 +340,29 @@ def llm_ic_pddl_planner(args, planner, domain):
 
     start_time = time.time()
 
-    # A. generate problem pddl file
-    task_suffix        = domain.get_task_suffix(task)
+    task_suffix  = domain.get_task_suffix(task)
     task_nl, task_pddl = domain.get_task(task) 
-    prompt             = planner.create_llm_ic_pddl_prompt(task_nl, domain_pddl, context)
-    raw_result         = planner.query(prompt)
-    task_pddl_         = planner.parse_result(raw_result)
-
-    # B. write the problem file into the problem folder
     task_pddl_file_name = f"./experiments/run{args.run}/problems/llm_ic_pddl/{task_suffix}"
-    with open(task_pddl_file_name, "w") as f:
-        f.write(task_pddl_)
-    time.sleep(1)
+    if not os.path.exists(task_pddl_file_name):
+        # A. generate problem pddl file
+        prompt             = planner.create_llm_ic_pddl_prompt(task_nl, domain_pddl, context)
+        raw_result         = planner.query(prompt)
+        task_pddl_         = planner.parse_result(raw_result)
+
+        # B. write the problem file into the problem folder
+        with open(task_pddl_file_name, "w") as f:
+            f.write(task_pddl_)
+        time.sleep(1)
 
     ## C. run fastforward to plan
     plan_file_name = f"./experiments/run{args.run}/plans/llm_ic_pddl/{task_suffix}"
     sas_file_name  = f"./experiments/run{args.run}/plans/llm_ic_pddl/{task_suffix}.sas"
-    os.system(f"python ./downward/fast-downward.py --alias {FAST_DOWNWARD_ALIAS} " + \
+    os.system(f"python ../downward/fast-downward.py --alias {FAST_DOWNWARD_ALIAS} " + \
               f"--search-time-limit {args.time_limit} --plan-file {plan_file_name} " + \
               f"--sas-file {sas_file_name} " + \
               f"{domain_pddl_file} {task_pddl_file_name}")
 
+    # import ipdb; ipdb.set_trace()
     # D. collect the least cost plan
     best_cost = 1e10
     best_plan = None
@@ -358,16 +375,16 @@ def llm_ic_pddl_planner(args, planner, domain):
                 best_plan = "\n".join([p.strip() for p in plans[:-1]])
 
     # E. translate the plan back to natural language, and write it to result
-    if best_plan:
-        plans_nl = planner.plan_to_language(best_plan, task_nl, domain_nl, domain_pddl)
-        plan_nl_file_name = f"./experiments/run{args.run}/results/llm_ic_pddl/{task_suffix}"
-        with open(plan_nl_file_name, "w") as f:
-            f.write(plans_nl)
-    end_time = time.time()
-    if best_plan:
-        print(f"[info] task {task} takes {end_time - start_time} sec, found a plan with cost {best_cost}")
-    else:
-        print(f"[info] task {task} takes {end_time - start_time} sec, no solution found")
+    # if best_plan:
+    #     plans_nl = planner.plan_to_language(best_plan, task_nl, domain_nl, domain_pddl)
+    #     plan_nl_file_name = f"./experiments/run{args.run}/results/llm_ic_pddl/{task_suffix}"
+    #     with open(plan_nl_file_name, "w") as f:
+    #         f.write(plans_nl)
+    # end_time = time.time()
+    # if best_plan:
+    #     print(f"[info] task {task} takes {end_time - start_time} sec, found a plan with cost {best_cost}")
+    # else:
+    #     print(f"[info] task {task} takes {end_time - start_time} sec, no solution found")
 
 
 def llm_pddl_planner(args, planner, domain):
