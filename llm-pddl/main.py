@@ -55,7 +55,7 @@ class Domain:
         # 1. p_example.nl  (a language description of the problem)
         # 2. p_example.pddl (the ground-truth problem pddl for the problem)
         # 3. p_example.sol  (the ground-truth solution in natural language to the problem)
-        self.context = ("p_example.nl", "p_example.pddl", "p_example.sol")
+        self.context = ("p_example.nl", "p_example-1.pddl", "p_example-2.pddl", "p_example-3.pddl", "p_example-4.pddl", "p_example.pddl", "p_example.sol")
         self.tasks = [] # should be list of tuples like (descritpion, ground_truth_pddl)
 
         self.grab_tasks()
@@ -92,15 +92,27 @@ class Domain:
 
     def get_context(self):
         nl_f   = f"./domains/{self.name}/{self.context[0]}"
-        pddl_f = f"./domains/{self.name}/{self.context[1]}"
-        sol_f  = f"./domains/{self.name}/{self.context[2]}"
+        pddl_f1 = f"./domains/{self.name}/{self.context[1]}"
+        pddl_f2 = f"./domains/{self.name}/{self.context[2]}"
+        pddl_f3 = f"./domains/{self.name}/{self.context[3]}"
+        pddl_f4 = f"./domains/{self.name}/{self.context[4]}"
+        pddl = f"./domains/{self.name}/{self.context[5]}"
+        sol_f  = f"./domains/{self.name}/{self.context[6]}"
         with open(nl_f, 'r') as f:
             nl   = f.read()
-        with open(pddl_f, 'r') as f:
-            pddl = f.read()
+        with open(pddl_f1, 'r') as f:
+            pddl1 = f.read()
+        with open(pddl_f2, 'r') as f:
+            pddl2 = f.read()
+        with open(pddl_f3, 'r') as f:
+            pddl3 = f.read()
+        with open(pddl_f4, 'r') as f:
+            pddl4 = f.read()
         with open(sol_f, 'r') as f:
             sol  = f.read()
-        return postprocess(nl), postprocess(pddl), postprocess(sol)
+        with open(pddl, "w") as f:
+            pddl = f.write(str(pddl1) + str(pddl2) + str(pddl3) + str(pddl4))
+        return postprocess(nl), postprocess(str(pddl)), postprocess(sol)
 
     def get_domain_pddl(self):
         domain_pddl_f = self.get_domain_pddl_file()
@@ -343,6 +355,7 @@ def llm_ic_pddl_planner(args, planner, domain):
     task_suffix  = domain.get_task_suffix(task)
     task_nl, task_pddl = domain.get_task(task) 
     task_pddl_file_name = f"./experiments/run{args.run}/problems/llm_ic_pddl/{task_suffix}"
+
     if not os.path.exists(task_pddl_file_name):
         # A. generate problem pddl file
         prompt             = planner.create_llm_ic_pddl_prompt(task_nl, domain_pddl, context)
@@ -355,12 +368,20 @@ def llm_ic_pddl_planner(args, planner, domain):
         time.sleep(1)
 
     ## C. run fastforward to plan
+    if not os.path.exists(task_pddl_file_name + "-1"):
+        pddl_1 = open(f"{task_pddl_file_name}-1", "x")
+    if not os.path.exists(task_pddl_file_name + "-2"):
+        pddl_2 = open(f"{task_pddl_file_name}-2", "x")
+    if not os.path.exists(task_pddl_file_name + "-3"):
+        pddl_3 = open(f"{task_pddl_file_name}-3", "x")
+    if not os.path.exists(task_pddl_file_name + "-4"):
+        pddl_4 = open(f"{task_pddl_file_name}-4", "x")
     plan_file_name = f"./experiments/run{args.run}/plans/llm_ic_pddl/{task_suffix}"
     sas_file_name  = f"./experiments/run{args.run}/plans/llm_ic_pddl/{task_suffix}.sas"
     os.system(f"python ../downward/fast-downward.py --alias {FAST_DOWNWARD_ALIAS} " + \
-              f"--search-time-limit {args.time_limit} --plan-file {plan_file_name} " + \
-              f"--sas-file {sas_file_name} " + \
-              f"{domain_pddl_file} {task_pddl_file_name}")
+            f"--search-time-limit {args.time_limit} --plan-file {plan_file_name} " + \
+            f"--sas-file {sas_file_name} " + \
+            f"{domain_pddl_file} {task_pddl_file_name}")
 
     # import ipdb; ipdb.set_trace()
     # D. collect the least cost plan
@@ -380,11 +401,11 @@ def llm_ic_pddl_planner(args, planner, domain):
     #     plan_nl_file_name = f"./experiments/run{args.run}/results/llm_ic_pddl/{task_suffix}"
     #     with open(plan_nl_file_name, "w") as f:
     #         f.write(plans_nl)
-    # end_time = time.time()
-    # if best_plan:
-    #     print(f"[info] task {task} takes {end_time - start_time} sec, found a plan with cost {best_cost}")
-    # else:
-    #     print(f"[info] task {task} takes {end_time - start_time} sec, no solution found")
+    end_time = time.time()
+    if best_plan:
+        print(f"[info] task {task} takes {end_time - start_time} sec, found a plan with cost {best_cost}")
+    else:
+        print(f"[info] task {task} takes {end_time - start_time} sec, no solution found")
 
 
 def llm_pddl_planner(args, planner, domain):
@@ -451,11 +472,11 @@ def llm_pddl_planner(args, planner, domain):
                 continue
 
     # E. translate the plan back to natural language, and write it to result
-    if best_plan:
-        plans_nl = planner.plan_to_language(best_plan, task_nl, domain_nl, domain_pddl)
-        plan_nl_file_name = f"./experiments/run{args.run}/results/llm_pddl/{task_suffix}"
-        with open(plan_nl_file_name, "w") as f:
-            f.write(plans_nl)
+    #if best_plan:
+    #    plans_nl = planner.plan_to_language(best_plan, task_nl, domain_nl, domain_pddl)
+    #    plan_nl_file_name = f"./experiments/run{args.run}/results/llm_pddl/{task_suffix}"
+    #    with open(plan_nl_file_name, "w") as f:
+    #        f.write(plans_nl)
     end_time = time.time()
     if best_plan:
         print(f"[info] task {task} takes {end_time - start_time} sec, found a plan with cost {best_cost}")

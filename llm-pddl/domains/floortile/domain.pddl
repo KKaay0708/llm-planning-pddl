@@ -1,6 +1,3 @@
-;;Created by Tomas de la Rosa
-;;Domain for painting floor tiles with two colors
-
 (define (domain floor-tile)
 (:requirements :typing :action-costs)
 (:types robot tile color - object)
